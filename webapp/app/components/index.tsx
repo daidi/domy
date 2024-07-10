@@ -1,11 +1,10 @@
 /* eslint-disable @typescript-eslint/no-use-before-define */
 'use client'
 import type { FC } from 'react'
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import produce, { setAutoFreeze } from 'immer'
 import { useBoolean, useGetState } from 'ahooks'
-import { io } from 'socket.io-client'
 import useConversation from '@/hooks/use-conversation'
 import Toast from '@/app/components/base/toast'
 import Sidebar from '@/app/components/sidebar'
@@ -171,11 +170,44 @@ const Main: FC = () => {
   */
   const [chatList, setChatList, getChatList] = useGetState<ChatItem[]>([])
   const chatListDomRef = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    // scroll to bottom
-    if (chatListDomRef.current)
+  const userScrolledRef = useRef(false)
+
+  const handleScrolltoBottom = useCallback(() => {
+    if (chatListDomRef.current && !userScrolledRef.current)
       chatListDomRef.current.scrollTop = chatListDomRef.current.scrollHeight
-  }, [chatList, currConversationId])
+  }, [])
+
+  useEffect(() => {
+    handleScrolltoBottom()
+  }, [handleScrolltoBottom])
+
+  useEffect(() => {
+    if (chatListDomRef.current) {
+      requestAnimationFrame(() => {
+        handleScrolltoBottom()
+      })
+    }
+  })
+
+  useEffect(() => {
+    const chatContainer = chatListDomRef.current
+    if (chatContainer) {
+      const setUserScrolled = () => {
+        if (chatContainer)
+          userScrolledRef.current = chatContainer.scrollHeight - chatContainer.scrollTop >= chatContainer.clientHeight + 30
+
+        console.log('userScrolledRef', userScrolledRef.current, chatContainer.scrollHeight - chatContainer.scrollTop, chatContainer.clientHeight)
+      }
+      chatContainer.addEventListener('scroll', setUserScrolled)
+      return () => chatContainer.removeEventListener('scroll', setUserScrolled)
+    }
+  }, [chatListDomRef.current])
+
+  // useEffect(() => {
+  //   // scroll to bottom
+  //   if (chatListDomRef.current)
+  //     chatListDomRef.current.scrollTop = chatListDomRef.current.scrollHeight
+  // }, [chatList, currConversationId])
   // user can not edit inputs if user had send message
   const canEditInpus = !chatList.some(item => item.isAnswer === false) && isNewConversation
   const createNewChat = () => {
@@ -387,7 +419,9 @@ const Main: FC = () => {
         else {
           const lastThought = responseItem.agent_thoughts?.[responseItem.agent_thoughts?.length - 1]
           if (lastThought)
-            lastThought.thought = lastThought.thought + message // need immer setAutoFreeze
+            lastThought.thought = lastThought.thought + message
+
+          // need immer setAutoFreeze
         }
         if (messageId && !hasSetResponseId) {
           responseItem.id = messageId
@@ -594,6 +628,7 @@ const Main: FC = () => {
   const renderSidebar = () => {
     if (!APP_ID || !APP_INFO || !promptConfig)
       return null
+
     return (
       <Sidebar
         list={conversationList}

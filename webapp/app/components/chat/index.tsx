@@ -109,7 +109,7 @@ const Chat: FC<IChatProps> = ({
   }, [query, isResponsing])
 
   useEffect(() => {
-    const socket = io('https://idomy.cn')
+    const socket = io('https://cloud.huntwiz.com')
 
     socket.on('connect', () => {
       console.log('Connected to WebSocket server')
